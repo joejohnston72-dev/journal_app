@@ -38,6 +38,12 @@ create table public.revisions (
 
 create index revisions_entry on public.revisions (entry_id);
 
+-- Explicit Data API access. New Supabase projects no longer expose tables automatically,
+-- so grant exactly what the app needs. RLS below still limits rows to your account.
+revoke all on public.entries, public.revisions from anon, authenticated;
+grant select, insert, update on public.entries to authenticated;
+grant select, insert on public.revisions to authenticated;
+
 -- Row-level security: only your account can read or write your rows.
 alter table public.entries   enable row level security;
 alter table public.revisions enable row level security;
@@ -52,7 +58,7 @@ create policy revisions_insert on public.revisions for insert with check (user_i
 -- No update/delete policies: revisions are append-only.
 
 -- Belt and braces: block changes to history and hard deletes even for privileged roles.
-create function public.forbid_change() returns trigger language plpgsql as $$
+create function public.forbid_change() returns trigger language plpgsql set search_path = '' as $$
 begin
   raise exception '% on % is not allowed: history is append-only', tg_op, tg_table_name;
 end $$;

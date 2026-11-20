@@ -10,6 +10,19 @@ $$;
 create function pg_temp.expect(label text, ok boolean) returns void language plpgsql as $$
 begin if not ok then raise exception 'FAILED: %', label; end if; raise notice 'ok: %', label; end $$;
 
+set role anon;
+do $$ begin
+  perform 1 from entries;
+  raise exception 'FAILED: anon can read entries';
+exception when insufficient_privilege then null;
+end $$;
+do $$ begin
+  perform push_entry('{}', '[]', null);
+  raise exception 'FAILED: anon can call push_entry';
+exception when insufficient_privilege then null;
+end $$;
+reset role;
+
 set role authenticated;
 set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
 
@@ -23,10 +36,17 @@ select pg_temp.expect('conflicting version still stored', exists (select 1 from 
 select pg_temp.expect('merge with both parents accepted', pg_temp.push('bbbbbbbb-0000-0000-0000-000000000004', 'bbbbbbbb-0000-0000-0000-000000000003', 'bbbbbbbb-0000-0000-0000-000000000002', 'merged')->>'status' = 'ok');
 select pg_temp.expect('entry body follows head', (select body from entries) = 'merged');
 
-update revisions set body = 'tampered';
-select pg_temp.expect('API cannot edit history', not exists (select 1 from revisions where body = 'tampered'));
-delete from entries;
-select pg_temp.expect('API cannot delete entries', (select count(*) from entries) = 1);
+do $$ begin
+  update revisions set body = 'tampered';
+  raise exception 'FAILED: API edited history';
+exception when insufficient_privilege then null;
+end $$;
+do $$ begin
+  delete from entries;
+  raise exception 'FAILED: API deleted entries';
+exception when insufficient_privilege then null;
+end $$;
+select pg_temp.expect('API cannot edit history or delete entries', (select count(*) from entries) = 1 and not exists (select 1 from revisions where body = 'tampered'));
 
 set request.jwt.claim.sub = '22222222-2222-2222-2222-222222222222';
 select pg_temp.expect('other account sees nothing', (select count(*) from entries) = 0 and (select count(*) from revisions) = 0);

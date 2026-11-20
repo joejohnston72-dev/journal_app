@@ -36,7 +36,7 @@ function SyncSection() {
         )}
         {s.status === 'signed-out' && (
           <>
-            <p>Sign in to back up to your server. We email you a 6-digit code.</p>
+            <p>Sign in to back up to your server. We email you a sign-in code.</p>
             {!sent ? (
               <form
                 onSubmit={async (e) => {
@@ -65,7 +65,7 @@ function SyncSection() {
                   }
                 }}
               >
-                <input className="field" inputMode="numeric" autoComplete="one-time-code" placeholder="6-digit code" value={code} onChange={(e) => setCode(e.target.value)} required />
+                <input className="field" inputMode="numeric" autoComplete="one-time-code" placeholder="Code from the email" value={code} onChange={(e) => setCode(e.target.value)} required />
                 <div className="row">
                   <button className="btn btn-primary">Sign in</button>
                   <button type="button" className="btn btn-quiet" onClick={() => setSent(false)}>

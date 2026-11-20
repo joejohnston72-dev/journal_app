@@ -35,12 +35,12 @@ npm run build
 2. Merge to `main`; the *Deploy* workflow publishes to `https://<you>.github.io/journal_app/`.
 
 ### 2. Supabase (server copy)
-1. Create a project in the **London (eu-west-2)** region.
-2. **SQL Editor** → paste and run `supabase/migrations/20261120000000_init.sql`.
-3. **Authentication → Users → Add user**: create your own account (email).
+1. Create a project in the **West EU (London)** region. Save the database password in your password manager.
+2. **SQL Editor** → paste and run `supabase/migrations/20261120000000_init.sql`. It grants table access explicitly (new projects no longer expose tables automatically).
+3. **Authentication → Users → Add user**: create your account. Use the **same email as your Supabase login**: without custom SMTP, Supabase only emails members of your organisation.
 4. **Authentication → Sign In / Providers**: turn **off** “Allow new users to sign up”.
-5. **Authentication → Emails → Magic Link** template: include `{{ .Token }}` so the email carries a 6‑digit code. (Codes, not links: a link would open Safari, not the Home Screen app.)
-6. **Project Settings → API**: copy the Project URL and the *publishable/anon* key into repo **Settings → Secrets and variables → Actions → Variables** as `SUPABASE_URL` and `SUPABASE_ANON_KEY`. Never the service-role key.
+5. **Authentication → Emails → Templates → Magic Link**: replace the link with `{{ .Token }}` so the email carries a code (6 or 8 digits, both work). A link would open Safari, not the Home Screen app.
+6. **Project Settings → API Keys**: copy the Project URL and the **publishable** key (`sb_publishable_…`) into repo **Settings → Secrets and variables → Actions → Variables** as `SUPABASE_URL` and `SUPABASE_ANON_KEY`. Never the secret key.
 7. Re-run the Deploy workflow. In the app: Settings → Server backup → sign in with the code.
 
 ### 3. iPhone

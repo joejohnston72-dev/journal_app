@@ -26,6 +26,28 @@ function serviceWorker(): Plugin {
   };
 }
 
+/**
+ * The Supabase URL must be the project API address (https://<ref>.supabase.co).
+ * A dashboard link is converted; anything else stops the build rather than
+ * shipping an app that silently can't back up.
+ */
+function checkSupabaseUrl(): void {
+  const raw = process.env.VITE_SUPABASE_URL?.trim();
+  if (!raw) return;
+  const dashboard = raw.match(/supabase\.com\/dashboard\/project\/([a-z0-9]+)/);
+  if (dashboard) {
+    process.env.VITE_SUPABASE_URL = `https://${dashboard[1]}.supabase.co`;
+    console.warn(`SUPABASE_URL was a dashboard link; using ${process.env.VITE_SUPABASE_URL}`);
+    return;
+  }
+  const url = raw.replace(/\/+$/, '');
+  if (!/^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(url) && !/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(url)) {
+    throw new Error(`SUPABASE_URL "${raw}" is not a Supabase API URL. Expected https://<project-ref>.supabase.co`);
+  }
+  process.env.VITE_SUPABASE_URL = url;
+}
+checkSupabaseUrl();
+
 export default defineConfig({
   // GitHub Pages serves the app from /<repo>/; CI sets VITE_BASE.
   base: process.env.VITE_BASE ?? '/',

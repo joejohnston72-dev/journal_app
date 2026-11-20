@@ -37,11 +37,12 @@ npm run build
 ### 2. Supabase (server copy)
 1. Create a project in the **West EU (London)** region. Save the database password in your password manager.
 2. **SQL Editor** → paste and run `supabase/migrations/20261120000000_init.sql`. It grants table access explicitly (new projects no longer expose tables automatically).
-3. **Authentication → Users → Add user**: create your account. Use the **same email as your Supabase login**: without custom SMTP, Supabase only emails members of your organisation.
-4. **Authentication → Sign In / Providers**: turn **off** “Allow new users to sign up”.
-5. **Authentication → Emails → Templates → Magic Link**: replace the link with `{{ .Token }}` so the email carries a code (6 or 8 digits, both work). A link would open Safari, not the Home Screen app.
-6. **Project Settings → API Keys**: copy the Project URL and the **publishable** key (`sb_publishable_…`) into repo **Settings → Secrets and variables → Actions → Variables** as `SUPABASE_URL` and `SUPABASE_ANON_KEY`. Never the secret key.
-7. Re-run the Deploy workflow. In the app: Settings → Server backup → sign in with the code.
+3. **Authentication → Users → Add user → Create new user**: your email, a strong password (save it in your password manager), tick **Auto Confirm User**.
+4. **Authentication → Sign In / Providers**: turn **off** “Allow new users to sign up”. Leave the Email provider on.
+5. **Project Settings → API Keys**: copy the Project URL and the **publishable** key (`sb_publishable_…`) into repo **Settings → Secrets and variables → Actions → Variables** as `SUPABASE_URL` and `SUPABASE_ANON_KEY`. Never the secret key.
+6. Re-run the Deploy workflow. In the app: Settings → Server backup → sign in with that email and password (once per device).
+
+Sign-in is email + password for now, so no email is ever sent and no custom SMTP is needed. Passkeys (Face ID) replace it in P1.
 
 ### 3. iPhone
 1. Open the Pages URL in Safari → Share → **Add to Home Screen**.

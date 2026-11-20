@@ -77,17 +77,15 @@ export function startSync(): void {
   }, 60_000);
 }
 
-export async function sendCode(email: string): Promise<void> {
+/**
+ * P0 stopgap: email + password (no email is sent, so no SMTP is needed).
+ * Passkeys replace this in P1. Sign-ups are off in Supabase, so only the
+ * account created in the dashboard can sign in.
+ */
+export async function signIn(email: string, password: string): Promise<void> {
   if (!supabase) throw new Error('Server not configured');
-  // shouldCreateUser: false — this is a single-account app; create the account in the Supabase dashboard.
-  const { error } = await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: false } });
-  if (error) throw error;
-}
-
-export async function verifyCode(email: string, token: string): Promise<void> {
-  if (!supabase) throw new Error('Server not configured');
-  const { error } = await supabase.auth.verifyOtp({ email, token, type: 'email' });
-  if (error) throw error;
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) throw new Error(error.message === 'Invalid login credentials' ? 'Email or password not recognised.' : error.message);
 }
 
 export async function signOut(): Promise<void> {

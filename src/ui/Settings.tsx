@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/schema';
 import { exportSnapshot, restoreSnapshot, snapshotFileName } from '../backup/snapshot';
-import { sendCode, signOut, syncNow, useSyncState, verifyCode } from '../sync/controller';
+import { signIn, signOut, syncNow, useSyncState } from '../sync/controller';
 import { timeAgo } from '../lib/format';
 import { applyTheme, getTheme, type Theme } from '../lib/theme';
 
@@ -23,8 +23,8 @@ function SyncSection() {
   const s = useSyncState();
   const unsynced = useLiveQuery(() => db.entries.where('dirty').equals(1).count(), []);
   const [email, setEmail] = useState('');
-  const [code, setCode] = useState('');
-  const [sent, setSent] = useState(false);
+  const [password, setPassword] = useState('');
+  const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
   return (
@@ -36,44 +36,28 @@ function SyncSection() {
         )}
         {s.status === 'signed-out' && (
           <>
-            <p>Sign in to back up to your server. We email you a sign-in code.</p>
-            {!sent ? (
-              <form
-                onSubmit={async (e) => {
-                  e.preventDefault();
-                  setMsg(null);
-                  try {
-                    await sendCode(email.trim());
-                    setSent(true);
-                  } catch (err) {
-                    setMsg(err instanceof Error ? err.message : String(err));
-                  }
-                }}
-              >
-                <input className="field" type="email" autoComplete="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
-                <button className="btn btn-primary">Send code</button>
-              </form>
-            ) : (
-              <form
-                onSubmit={async (e) => {
-                  e.preventDefault();
-                  setMsg(null);
-                  try {
-                    await verifyCode(email.trim(), code.trim());
-                  } catch (err) {
-                    setMsg(err instanceof Error ? err.message : String(err));
-                  }
-                }}
-              >
-                <input className="field" inputMode="numeric" autoComplete="one-time-code" placeholder="Code from the email" value={code} onChange={(e) => setCode(e.target.value)} required />
-                <div className="row">
-                  <button className="btn btn-primary">Sign in</button>
-                  <button type="button" className="btn btn-quiet" onClick={() => setSent(false)}>
-                    Use a different email
-                  </button>
-                </div>
-              </form>
-            )}
+            <p>Sign in once on this phone to back up to your server. Use the email and password of the account you created in Supabase.</p>
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                setMsg(null);
+                setBusy(true);
+                try {
+                  await signIn(email.trim(), password);
+                  setPassword('');
+                } catch (err) {
+                  setMsg(err instanceof Error ? err.message : String(err));
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              <input className="field" type="email" autoComplete="username" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+              <input className="field" type="password" autoComplete="current-password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+              <button className="btn btn-primary" disabled={busy}>
+                {busy ? 'Signing in…' : 'Sign in'}
+              </button>
+            </form>
           </>
         )}
         {['idle', 'syncing', 'offline', 'error'].includes(s.status) && (

@@ -1,0 +1,100 @@
+/*
+ * Design tokens — first draft (P0). Direction: "First Light" placeholder
+ * (dawn amber, ink blue-black, paper). Swap values here once UX-4 picks a brand.
+ * Calm rules: dark low-contrast morning theme first, light second; serif for
+ * writing, system sans for interface; slow soft motion; Reduce Motion honoured.
+ */
+
+:root {
+  /* Type */
+  --font-ui: -apple-system, BlinkMacSystemFont, system-ui, 'Segoe UI', sans-serif;
+  --font-write: ui-serif, 'New York', 'Iowan Old Style', Georgia, serif;
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: 1.1875rem;
+  --text-xl: 1.5rem;
+  --leading-ui: 1.4;
+  --leading-write: 1.7;
+
+  /* Space (4pt scale) */
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 24px;
+  --s6: 32px;
+  --s7: 48px;
+
+  /* Shape */
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 22px;
+
+  /* Motion: 300–500 ms ease-in-out, nothing bounces */
+  --ease: cubic-bezier(0.45, 0, 0.55, 1);
+  --dur-fast: 300ms;
+  --dur: 400ms;
+  --dur-slow: 500ms;
+
+  /* Layout */
+  --measure: 38rem;
+  --tabbar-h: 56px;
+}
+
+/* Dark morning theme (default) */
+:root,
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #111318;
+  --surface: #181b22;
+  --surface-2: #1f232c;
+  --line: #2a2f3a;
+  --text: #e6e0d4;
+  --text-soft: #b9b3a7;
+  --muted: #8d887e;
+  --accent: #d6a15c;
+  --accent-ink: #1a1408;
+  --focus: #d6a15c66;
+  --warn: #c99a6b;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+  --bg: #f5f0e6;
+  --surface: #fbf7ef;
+  --surface-2: #efe8da;
+  --line: #e0d7c6;
+  --text: #1c2130;
+  --text-soft: #3c4255;
+  --muted: #6a6a6a;
+  --accent: #9a5f22;
+  --accent-ink: #fffaf1;
+  --focus: #9a5f2244;
+  --warn: #8a5a2b;
+}
+
+@media (prefers-color-scheme: light) {
+  :root[data-theme='system'] {
+    color-scheme: light;
+    --bg: #f5f0e6;
+    --surface: #fbf7ef;
+    --surface-2: #efe8da;
+    --line: #e0d7c6;
+    --text: #1c2130;
+    --text-soft: #3c4255;
+    --muted: #6a6a6a;
+    --accent: #9a5f22;
+    --accent-ink: #fffaf1;
+    --focus: #9a5f2244;
+    --warn: #8a5a2b;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-fast: 0ms;
+    --dur: 0ms;
+    --dur-slow: 0ms;
+  }
+}

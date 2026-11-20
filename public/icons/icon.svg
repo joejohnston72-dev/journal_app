@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Placeholder mark ("First Light"): a low sun over a page line. Replace once branding (UX-4) is chosen. -->
+  <rect width="512" height="512" fill="#111318"/>
+  <circle cx="256" cy="300" r="92" fill="#d6a15c"/>
+  <rect x="0" y="300" width="512" height="212" fill="#111318"/>
+  <rect x="120" y="318" width="272" height="10" rx="5" fill="#e6e0d4" opacity="0.85"/>
+  <rect x="160" y="352" width="192" height="8" rx="4" fill="#e6e0d4" opacity="0.35"/>
+</svg>

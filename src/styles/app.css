@@ -327,3 +327,14 @@ p {
 .settings-group > :last-child {
   margin-bottom: 0;
 }
+
+/* Prompt feedback and session rating (PRM-3) */
+.btn[aria-pressed='true'],
+.btn[aria-checked='true'] {
+  color: var(--text);
+  border: 1px solid var(--accent);
+}
+
+.prompt-feedback {
+  margin-top: var(--s3);
+}

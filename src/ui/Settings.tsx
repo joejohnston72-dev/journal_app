@@ -5,12 +5,15 @@ import { exportSnapshot, restoreSnapshot, snapshotFileName } from '../backup/sna
 import { signIn, signOut, syncNow, useSyncState } from '../sync/controller';
 import { timeAgo } from '../lib/format';
 import { applyTheme, getTheme, type Theme } from '../lib/theme';
+import { exportFeedback, importPrompts, parsePromptText } from '../prompts/library';
+import { GENERATOR_INSTRUCTIONS } from '../prompts/generator';
 
 export function Settings() {
   return (
     <main className="screen">
       <h1>Settings</h1>
       <SyncSection />
+      <PromptsSection />
       <BackupSection />
       <NotificationSection />
       <AppearanceSection />
@@ -214,6 +217,59 @@ function StorageSection() {
           {persisted ? 'Storage is marked persistent.' : 'iPhone may clear browser storage after weeks unused; the server copy is the one that counts.'}
         </p>
         <p className="muted">Version {__APP_VERSION__}</p>
+      </div>
+    </>
+  );
+}
+
+/** PRM-3 / LOOP-1 (manual bridge until the P2 nightly engine): send feedback to Claude, paste new prompts back. */
+function PromptsSection() {
+  const counts = useLiveQuery(async () => {
+    const all = await db.prompts.toArray();
+    return { queued: all.filter((p) => p.status === 'queued').length, total: all.length };
+  }, []);
+  const [paste, setPaste] = useState('');
+  const [msg, setMsg] = useState<string | null>(null);
+
+  return (
+    <>
+      <h2>Prompts</h2>
+      <div className="settings-group">
+        <p>
+          {counts ? `${counts.queued} prompts waiting, ${counts.total} in your library.` : ''} Nothing is ever removed from the library.
+        </p>
+        <p className="muted small">To get fresh prompts: copy your feedback, paste it into Claude, then paste Claude’s new prompts below.</p>
+        <div className="row">
+          <button
+            className="btn"
+            onClick={async () => {
+              const data = await exportFeedback(db);
+              await navigator.clipboard.writeText(`${GENERATOR_INSTRUCTIONS}\n\n\`\`\`json\n${JSON.stringify(data, null, 2)}\n\`\`\``);
+              setMsg('Copied. Paste it into a chat with Claude.');
+            }}
+          >
+            Copy feedback for Claude
+          </button>
+        </div>
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault();
+            try {
+              const items = parsePromptText(paste);
+              const r = await importPrompts(db, items, 'claude', `batch ${new Date().toISOString().slice(0, 10)}`);
+              setMsg(`Added ${r.added} prompts${r.skipped ? ` (${r.skipped} already in your library)` : ''}.`);
+              if (r.added) setPaste('');
+            } catch (err) {
+              setMsg(err instanceof Error ? err.message : String(err));
+            }
+          }}
+        >
+          <textarea className="field" rows={4} placeholder="Paste new prompts: one per line, or Claude’s JSON" value={paste} onChange={(e) => setPaste(e.target.value)} />
+          <button className="btn" disabled={!paste.trim()}>
+            Add to queue
+          </button>
+        </form>
+        {msg && <p className="muted small">{msg}</p>}
       </div>
     </>
   );

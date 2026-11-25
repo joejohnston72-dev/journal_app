@@ -12,10 +12,13 @@ interface Props {
   /** Existing entry, or undefined to start a new one (created on first keystroke). */
   entryId?: string;
   prompt?: string;
-  onClose: () => void;
+  /** Library prompt this entry answers (PRM-7: entries link back to their prompt). */
+  promptId?: string;
+  /** Called with the entry id when an entry exists (so a session can be rated). */
+  onClose: (savedEntryId?: string) => void;
 }
 
-export function EntryEditor({ entryId, prompt, onClose }: Props) {
+export function EntryEditor({ entryId, prompt, promptId, onClose }: Props) {
   const [id] = useState(() => entryId ?? newId());
   const entry = useLiveQuery(() => db.entries.get(id), [id]);
   const sync = useSyncState();
@@ -48,7 +51,7 @@ export function EntryEditor({ entryId, prompt, onClose }: Props) {
       .then(async () => {
         if (!exists.current) {
           if (!body.trim()) return;
-          await createEntry(db, { id, body });
+          await createEntry(db, { id, body, promptId: promptId ?? null });
           exists.current = true;
         } else {
           await saveEntry(db, id, { body });
@@ -83,7 +86,7 @@ export function EntryEditor({ entryId, prompt, onClose }: Props) {
 
   const close = async () => {
     await flush();
-    onClose();
+    onClose(exists.current ? id : undefined);
   };
 
   const status = (() => {

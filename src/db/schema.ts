@@ -63,6 +63,43 @@ export interface Revision {
   synced: 0 | 1;
 }
 
+export type PromptSource = 'reminders' | 'claude' | 'own' | 'starter';
+/** queued → served (shown on Today) → answered. Skip sends it back to queued. Never deleted (PRM-4). */
+export type PromptStatus = 'queued' | 'served' | 'answered' | 'archived';
+
+export interface Prompt {
+  id: string;
+  text: string;
+  /** One line: why this prompt (PRM-7). */
+  why: string | null;
+  source: PromptSource;
+  /** Free-form origin label, e.g. the Reminders list it came from or the batch it was generated in. */
+  origin: string | null;
+  status: PromptStatus;
+  /** Queue position; lower comes first (PRM-5). */
+  order: number;
+  createdAt: number;
+  /** Local day (YYYY-MM-DD) it was put on Today. */
+  servedOn: string | null;
+  answeredAt: number | null;
+  skipCount: number;
+  /** Per-prompt feedback (PRM-3): 1 = helpful, -1 = not for me. */
+  rating: 1 | -1 | null;
+  feedback: string | null;
+}
+
+export interface Session {
+  id: string;
+  /** Local day, YYYY-MM-DD. */
+  date: string;
+  createdAt: number;
+  promptId: string | null;
+  entryId: string | null;
+  /** 1–5, how the session felt. */
+  rating: number | null;
+  note: string | null;
+}
+
 export interface Meta {
   key: string;
   value: unknown;
@@ -72,6 +109,8 @@ export class JournalDB extends Dexie {
   entries!: EntityTable<Entry, 'id'>;
   revisions!: EntityTable<Revision, 'id'>;
   meta!: EntityTable<Meta, 'key'>;
+  prompts!: EntityTable<Prompt, 'id'>;
+  sessions!: EntityTable<Session, 'id'>;
 
   constructor(name = 'journal') {
     super(name);
@@ -81,6 +120,11 @@ export class JournalDB extends Dexie {
       entries: 'id, originalDate, updatedAt, dirty, deletedAt',
       revisions: 'id, entryId, [entryId+openedAt], synced',
       meta: 'key',
+    });
+    // v2: prompt library (PRM-1/3/4/6/7) and session ratings. Adds tables only; existing data untouched.
+    this.version(2).stores({
+      prompts: 'id, status, order, servedOn, source',
+      sessions: 'id, date, promptId',
     });
   }
 }

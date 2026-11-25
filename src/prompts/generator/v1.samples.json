@@ -1,0 +1,21 @@
+{
+  "version": "v1",
+  "note": "Sample input (what Copy feedback produces) and an expected-shape output. Tests check the output imports cleanly.",
+  "input": {
+    "format": "journal-prompt-feedback",
+    "version": 1,
+    "exportedAt": "2026-11-25T08:00:00.000Z",
+    "queuedCount": 1,
+    "prompts": [
+      { "text": "What is asking for your attention this morning?", "source": "reminders", "status": "answered", "skips": 0, "rating": 1, "feedback": "Good, simple start" },
+      { "text": "Which belief of yours would you most like to test this week?", "source": "reminders", "status": "queued", "skips": 2, "rating": -1, "feedback": "Too abstract before coffee" }
+    ],
+    "upcoming": ["Which belief of yours would you most like to test this week?"],
+    "sessions": [{ "date": "2026-11-24", "rating": 4, "note": "Flowed", "prompt": "What is asking for your attention this morning?" }],
+    "recentEntries": [{ "date": "2026-11-24", "prompt": "What is asking for your attention this morning?", "text": "The house move. I keep putting off the call to the agent…" }]
+  },
+  "expectedOutput": [
+    { "text": "What is the smallest step on the house move you could take before lunch today?", "why": "Follows the 24 Nov entry about putting off the agent call" },
+    { "text": "What is one thing you're looking forward to this week?", "why": "A lighter prompt; abstract ones were rated down" }
+  ]
+}

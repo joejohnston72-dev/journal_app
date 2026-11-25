@@ -1,4 +1,4 @@
-import type { Entry, JournalDB, Revision } from '../db/schema';
+import type { Entry, JournalDB, Prompt, Revision, Session } from '../db/schema';
 
 /**
  * Snapshot = the manual backup file and the nightly backup format (DATA-4, DATA-6).
@@ -7,7 +7,8 @@ import type { Entry, JournalDB, Revision } from '../db/schema';
  */
 
 export const SNAPSHOT_FORMAT = 'journal-app-snapshot';
-export const SNAPSHOT_VERSION = 1;
+/** v2 adds prompts and sessions. v1 files (no prompts) still restore. */
+export const SNAPSHOT_VERSION = 2;
 
 export interface Snapshot {
   format: typeof SNAPSHOT_FORMAT;
@@ -15,6 +16,8 @@ export interface Snapshot {
   exportedAt: string;
   entries: Entry[];
   revisions: Revision[];
+  prompts?: Prompt[];
+  sessions?: Session[];
 }
 
 export interface RestoreReport {
@@ -22,15 +25,19 @@ export interface RestoreReport {
   entriesSkipped: number;
   revisionsAdded: number;
   revisionsSkipped: number;
+  promptsAdded: number;
+  sessionsAdded: number;
 }
 
 export async function exportSnapshot(db: JournalDB, now = new Date()): Promise<Snapshot> {
-  return db.transaction('r', db.entries, db.revisions, async () => ({
+  return db.transaction('r', [db.entries, db.revisions, db.prompts, db.sessions], async () => ({
     format: SNAPSHOT_FORMAT,
     version: SNAPSHOT_VERSION,
     exportedAt: now.toISOString(),
     entries: await db.entries.toArray(),
     revisions: await db.revisions.toArray(),
+    prompts: await db.prompts.toArray(),
+    sessions: await db.sessions.toArray(),
   }));
 }
 
@@ -46,6 +53,12 @@ export function parseSnapshot(raw: unknown): Snapshot {
     throw new Error('This backup was made by a newer version of the app. Update the app, then restore.');
   }
   if (!Array.isArray(s.entries) || !Array.isArray(s.revisions)) throw new Error('This backup is incomplete.');
+  if ((s.prompts !== undefined && !Array.isArray(s.prompts)) || (s.sessions !== undefined && !Array.isArray(s.sessions))) {
+    throw new Error('This backup is incomplete.');
+  }
+  for (const p of s.prompts ?? []) {
+    if (typeof p?.id !== 'string' || typeof p.text !== 'string') throw new Error('This backup contains a damaged prompt.');
+  }
   for (const e of s.entries) {
     if (typeof e?.id !== 'string' || typeof e.body !== 'string') throw new Error('This backup contains a damaged entry.');
   }
@@ -59,8 +72,17 @@ export function parseSnapshot(raw: unknown): Snapshot {
 
 export async function restoreSnapshot(db: JournalDB, input: unknown): Promise<RestoreReport> {
   const snap = parseSnapshot(input);
-  const report: RestoreReport = { entriesAdded: 0, entriesSkipped: 0, revisionsAdded: 0, revisionsSkipped: 0 };
-  await db.transaction('rw', db.entries, db.revisions, async () => {
+  const report: RestoreReport = { entriesAdded: 0, entriesSkipped: 0, revisionsAdded: 0, revisionsSkipped: 0, promptsAdded: 0, sessionsAdded: 0 };
+  await db.transaction('rw', [db.entries, db.revisions, db.prompts, db.sessions], async () => {
+    const haveP = new Set(await db.prompts.toCollection().primaryKeys());
+    const prompts = (snap.prompts ?? []).filter((p) => !haveP.has(p.id));
+    await db.prompts.bulkAdd(prompts);
+    report.promptsAdded = prompts.length;
+    const haveS = new Set(await db.sessions.toCollection().primaryKeys());
+    const sessions = (snap.sessions ?? []).filter((x) => !haveS.has(x.id));
+    await db.sessions.bulkAdd(sessions);
+    report.sessionsAdded = sessions.length;
+
     const haveRevs = new Set(await db.revisions.toCollection().primaryKeys());
     const revs = snap.revisions
       .filter((r) => !haveRevs.has(r.id))

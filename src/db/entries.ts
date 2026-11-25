@@ -1,6 +1,7 @@
 import type { Entry, EntryKind, JournalDB, Revision } from './schema';
 import { newId } from '../lib/id';
 import { notifyLocalChange } from '../sync/signal';
+import { isDividerLine } from '../lib/sessions';
 
 /** While typing, one unsealed revision absorbs saves for up to this long, then a new one starts. */
 export const REVISION_WINDOW_MS = 60_000;
@@ -178,7 +179,22 @@ export async function resolveConflict(
 /** Title shown in lists: the user's/auto title, else the first line. */
 export function displayTitle(e: Pick<Entry, 'title' | 'body'>): string {
   if (e.title.trim()) return e.title.trim();
-  const first = e.body.split('\n').find((l) => l.trim());
+  const first = e.body.split('\n').find((l) => l.trim() && !isDividerLine(l));
   if (!first) return 'Untitled';
   return first.length > 60 ? `${first.slice(0, 57).trimEnd()}…` : first.trim();
+}
+
+/** Today's written entry (one per day: prompt answers and quick thoughts share it). */
+export async function findTodaysEntry(db: JournalDB, now = new Date()): Promise<Entry | undefined> {
+  const recent = await db.entries.orderBy('originalDate').reverse().limit(20).toArray();
+  return recent.find((e) => {
+    const d = new Date(e.originalDate);
+    return (
+      !e.deletedAt &&
+      e.kind === 'text' &&
+      d.getFullYear() === now.getFullYear() &&
+      d.getMonth() === now.getMonth() &&
+      d.getDate() === now.getDate()
+    );
+  });
 }

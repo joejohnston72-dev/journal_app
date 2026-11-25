@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type Prompt } from '../db/schema';
-import { isSameDay, longDate } from '../lib/format';
+import { longDate } from '../lib/format';
+import { findTodaysEntry } from '../db/entries';
 import { fallbackPrompt, localDay, ratePrompt, skipPrompt, todaysPrompt } from '../prompts/library';
 
 interface Props {
-  onWrite: (opts: { entryId?: string; prompt?: string; promptId?: string }) => void;
+  onWrite: (opts: { entryId?: string; prompt?: string; promptId?: string; capture?: boolean }) => void;
 }
 
 export function Today({ onWrite }: Props) {
@@ -20,10 +21,8 @@ export function Today({ onWrite }: Props) {
   }, [day]);
 
   const served = useLiveQuery(() => (servedId ? db.prompts.get(servedId) : undefined), [servedId]);
-  const todays = useLiveQuery(async () => {
-    const recent = await db.entries.orderBy('originalDate').reverse().limit(20).toArray();
-    return recent.find((e) => !e.deletedAt && e.kind === 'text' && isSameDay(new Date(e.originalDate), now));
-  }, []);
+  // One entry per day: the prompt answer and any quick thoughts all land here.
+  const todays = useLiveQuery(() => findTodaysEntry(db, new Date()), [day]);
 
   if (servedId === undefined) return <main className="screen" />;
   const text = served?.text ?? fallbackPrompt(now);
@@ -39,7 +38,7 @@ export function Today({ onWrite }: Props) {
         {served?.why && <p className="muted small">Why this prompt: {served.why}</p>}
         <button
           className="btn btn-primary"
-          onClick={() => onWrite(todays ? { entryId: todays.id, prompt: text, promptId: served?.id } : { prompt: text, promptId: served?.id })}
+          onClick={() => onWrite({ entryId: todays?.id, prompt: text, promptId: served?.id, capture: true })}
         >
           {todays ? 'Continue writing' : 'Write'}
         </button>
@@ -52,6 +51,10 @@ export function Today({ onWrite }: Props) {
         )}
         {served && <PromptFeedback prompt={served} />}
       </section>
+      <button className="btn btn-quiet quick-thought" onClick={() => onWrite({ entryId: todays?.id, capture: true })}>
+        Quick thought
+      </button>
+      <p className="muted small">Everything you write today stays together on one page.</p>
     </main>
   );
 }

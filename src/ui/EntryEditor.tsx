@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/schema';
 import { createEntry, displayTitle, moveToBin, resolveConflict, restoreFromBin, saveEntry } from '../db/entries';
 import { bufferDraft, clearDraft } from '../db/draftBuffer';
 import { newId } from '../lib/id';
 import { useSyncState } from '../sync/controller';
+import { NEW_SESSION_GAP_MS, joinSessions, sessionLabel, splitSessions } from '../lib/sessions';
 
 const SAVE_DEBOUNCE_MS = 300;
 
@@ -14,11 +15,13 @@ interface Props {
   prompt?: string;
   /** Library prompt this entry answers (PRM-7: entries link back to their prompt). */
   promptId?: string;
+  /** Quick capture into today's entry: caret goes to the end, and a new session starts if the day was left a while ago. */
+  capture?: boolean;
   /** Called with the entry id when an entry exists (so a session can be rated). */
   onClose: (savedEntryId?: string) => void;
 }
 
-export function EntryEditor({ entryId, prompt, promptId, onClose }: Props) {
+export function EntryEditor({ entryId, prompt, promptId, capture, onClose }: Props) {
   const [id] = useState(() => entryId ?? newId());
   const entry = useLiveQuery(() => db.entries.get(id), [id]);
   const sync = useSyncState();
@@ -30,6 +33,9 @@ export function EntryEditor({ entryId, prompt, promptId, onClose }: Props) {
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const queue = useRef<Promise<unknown>>(Promise.resolve());
   const [saving, setSaving] = useState(false);
+  /** Label of a new session that has a divider on screen but no text yet; it joins the entry on the first keystroke. */
+  const [pending, setPending] = useState<string | null>(null);
+  const autoChecked = useRef(false);
 
   // Load text once; afterwards adopt outside changes (e.g. a sync) only when nothing is pending.
   useEffect(() => {
@@ -39,7 +45,11 @@ export function EntryEditor({ entryId, prompt, promptId, onClose }: Props) {
       lastSaved.current = entry.body;
       setText(entry.body);
     }
-  }, [entry]);
+    if (capture && !autoChecked.current) {
+      autoChecked.current = true;
+      if (entry.body.trim() && Date.now() - entry.updatedAt >= NEW_SESSION_GAP_MS) setPending(sessionLabel());
+    }
+  }, [entry, capture]);
 
   const flush = useCallback(() => {
     clearTimeout(timer.current);
@@ -84,6 +94,17 @@ export function EntryEditor({ entryId, prompt, promptId, onClose }: Props) {
     };
   }, [flush]);
 
+  const committed = splitSessions(text ?? '');
+  const sessions = pending ? [...committed, { label: pending, text: '' }] : committed;
+  const onSession = (i: number, v: string) => {
+    const next = sessions.map((s, j) => (j === i ? { ...s, text: v } : s));
+    const typingInPending = pending !== null && i === sessions.length - 1;
+    if (typingInPending && !v) return;
+    if (typingInPending) setPending(null);
+    onChange(joinSessions(typingInPending ? next : next.slice(0, committed.length)));
+  };
+  const canAddSession = Boolean(text?.trim()) && !pending && !entry?.deletedAt;
+
   const close = async () => {
     await flush();
     onClose(exists.current ? id : undefined);
@@ -106,6 +127,12 @@ export function EntryEditor({ entryId, prompt, promptId, onClose }: Props) {
         <span className="editor-status" aria-live="polite">
           {status}
         </span>
+        <span className="row-tight">
+        {canAddSession && (
+          <button className="btn btn-quiet small" onClick={() => setPending(sessionLabel())}>
+            New session
+          </button>
+        )}
         {entry && (
           <button
             className="btn btn-quiet small"
@@ -121,25 +148,84 @@ export function EntryEditor({ entryId, prompt, promptId, onClose }: Props) {
             {entry.deletedAt ? 'Restore' : 'Move to bin'}
           </button>
         )}
+        </span>
       </div>
       <div className="editor-scroll">
         <div className="editor-inner">
           {entry?.conflict && <ConflictNotice entryId={id} theirs={entry.conflict.theirRevisionId} mine={text ?? ''} />}
           {entry?.deletedAt && <p className="notice small">This entry is in the bin. Nothing in the bin is ever emptied automatically.</p>}
           {prompt && <p className="editor-prompt">{prompt}</p>}
-          <textarea
-            className="editor-text"
-            value={text ?? ''}
-            onChange={(e) => onChange(e.target.value)}
-            onBlur={() => void flush()}
-            placeholder={text === null ? '' : 'Begin anywhere.'}
-            autoFocus={!entryId}
-            spellCheck
-            aria-label="Entry text"
-          />
+          {sessions.map((s, i) => {
+            const last = i === sessions.length - 1;
+            return (
+              <div key={i}>
+                {s.label !== null && (
+                  <div className="session-divider" role="separator" aria-label={`New session, ${s.label}`}>
+                    <span>{s.label}</span>
+                  </div>
+                )}
+                <SessionText
+                  value={s.text}
+                  last={last}
+                  onChange={(v) => onSession(i, v)}
+                  onBlur={() => void flush()}
+                  placeholder={text === null ? '' : i === 0 ? 'Begin anywhere.' : last ? 'Carry on…' : ''}
+                  focus={last && (!entryId || (text !== null && (capture || pending !== null)))}
+                  focusKey={pending ?? ''}
+                  loading={text === null}
+                  label={i === 0 ? 'Entry text' : `Session at ${s.label}`}
+                />
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
+  );
+}
+
+/** One session's text. Grows with its content so the day reads as one page. */
+function SessionText(props: {
+  value: string;
+  last: boolean;
+  onChange: (v: string) => void;
+  onBlur: () => void;
+  placeholder: string;
+  focus: boolean;
+  focusKey: string;
+  /** Existing text not loaded yet: typing now could replace it, so wait. */
+  loading: boolean;
+  label: string;
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, [props.value]);
+  const focused = useRef<string | null>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || !props.focus || focused.current === props.focusKey || el === document.activeElement) return;
+    focused.current = props.focusKey;
+    el.focus();
+    el.setSelectionRange(el.value.length, el.value.length);
+    el.scrollIntoView({ block: 'center' });
+  }, [props.focus, props.focusKey]);
+  return (
+    <textarea
+      ref={ref}
+      className={props.last ? 'editor-text' : 'editor-text editor-text-fit'}
+      value={props.value}
+      onChange={(e) => props.onChange(e.target.value)}
+      onBlur={props.onBlur}
+      placeholder={props.placeholder}
+      rows={1}
+      readOnly={props.loading}
+      spellCheck
+      aria-label={props.label}
+    />
   );
 }
 

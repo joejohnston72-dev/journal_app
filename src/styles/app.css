@@ -244,6 +244,10 @@ p {
   margin: 0 auto;
 }
 
+.editor-bar .btn {
+  white-space: nowrap;
+}
+
 .editor-status {
   color: var(--muted);
   font-size: var(--text-xs);
@@ -280,6 +284,36 @@ p {
   font-size: var(--text-lg);
   line-height: var(--leading-write);
   caret-color: var(--accent);
+}
+
+.editor-text-fit {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.row-tight {
+  display: flex;
+  gap: var(--s2);
+}
+
+/* A small, clear break between writing sessions in the same day. */
+.session-divider {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  margin: var(--s5) 0 var(--s4);
+  color: var(--muted);
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+  animation: fade-in var(--dur) var(--ease);
+}
+
+.session-divider::before,
+.session-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--line);
 }
 
 .editor-text::placeholder {
@@ -337,4 +371,9 @@ p {
 
 .prompt-feedback {
   margin-top: var(--s3);
+}
+
+.quick-thought {
+  display: block;
+  margin: var(--s4) 0 var(--s2);
 }
